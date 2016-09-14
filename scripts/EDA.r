@@ -2,7 +2,7 @@
 # EDA FOR CODE FOR DC #
 #######################
 
-directory <- "C:/Users/Mao/Downloads/Code for DC maps"
+directory <- "C:/Users/Mao/Documents/GitHub/greatergreaterhousing"
 setwd(directory)
 
 library(maptools)
@@ -11,29 +11,34 @@ library(ggmap)
 library(rgdal)
 library(readr)
 library(broom)
-
-new_columbia <- readOGR(dsn="C:/Users/Mao/Downloads/New_Columbia_Boundary", layer="New_Columbia_Boundary")
-plot(new_columbia)
-coordinates(new_columbia)
-
-overlay_zones <- readOGR(dsn="C:/Users/Mao/Downloads/Overlay_Zones", layer="Overlay_Zones")
-plot(overlay_zones)
-coordinates(overlay_zones)
+library(dplyr)
 
 # load data
-puds <- readOGR(dsn="C:/Users/Mao/Downloads/Planned_Unit_Development_PUDs", layer="Planned_Unit_Development_PUDs")
-coordinates(puds)
+puds <- readOGR(dsn=paste0(directory, "/data/Planned_Unit_Development_PUDs"), layer="Planned_Unit_Development_PUDs")
 
-data <- read_csv("")
+# convert the shapefile to a data frame
+puds_data <- as(puds, "data.frame")
+plot_data <- tidy(puds)
 
- # convert the shapefile to a data frame
-puds_data <- fortify(puds)
-head(shapedata)
+# merge the data
+merged_data <- merge(puds_data, plot_data, by.x="row.names", by.y="id", all.y=TRUE)
 
-map <- get_map("641 S Street NW, Washington, DC", zoom=13)
+# get a map of DC
+map <- get_map("641 S Street NW, Washington, DC", zoom=12)
 ggmap(map)
 
-ggmap(map) + geom_polygon(aes(x=long, y=lat, group=group), 
-               data=fortify(puds_data), color='black', 
-               fill=NA, size=1)
+# mutate PUD_ZONING INTO SOMETHING SIMPLER
+merged_data <- mutate(merged_data,
+                      ZONING = ifelse(substring(PUD_ZONING,1,1)=='C', "Commercial",
+                                      ifelse(substring(PUD_ZONING,1,1)=='R', "Residential",
+                                             "Other")
+                                      )
+                      )
+
+ggmap(map) + geom_polygon(aes(x=long, y=lat, group=group, fill=ZONING), 
+               data=fortify(merged_data), color='black', 
+               size=0.5) +
+  theme_bw() +
+  theme(legend.position="bottom") +
+  ggtitle("Zoning of Planned Unit Developments")
 
